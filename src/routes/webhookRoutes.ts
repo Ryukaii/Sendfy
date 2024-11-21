@@ -16,7 +16,7 @@ const isAdmin = async (req: Request, res: Response, next: Function) => {
       return;
     }
     const user = await User.findById(req.user.userId);
-    if (!user || user.isAdmin !== false) {
+    if (!user || user.isAdmin !== true) {
       res.status(403).send("Acesso negado");
       return;
     }

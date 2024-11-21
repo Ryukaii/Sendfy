@@ -1,63 +1,47 @@
-import express, { Request, Response } from "express";
-import { sendSms } from "../utils/smsUtils";
-import { Campaign } from "../models/Campaign";
-import { CampaignHistory } from "../models/CampaignHistory";
-import { Integration } from "../models/Integration";
+// src/routes/authRoutes.ts
+import express, { Request, Response, NextFunction } from "express";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import { User } from "../models/User";
+import redisClient from "../utils/redisClient"; // Importar o Redis Client
+import authMiddleware from "../middleware/auth"; // Importar o middleware de autenticação
 
 const router = express.Router();
 
-// Receber dados do webhook e enviar SMS
-router.post(
-  "/webhook/:webhookId",
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const { nome, telefone, email } = req.body;
-      const webhookId = req.params.webhookId;
+// Rota de Login
+router.post("/login", async (req: Request, res: Response) => {
+  try {
+    const { username, password } = req.body;
+    const user = await User.findOne({ username });
+    if (user && (await bcrypt.compare(password, user.password))) {
+      const token = jwt.sign(
+        { userId: user._id },
+        process.env.JWT_SECRET as string,
+        { expiresIn: "1h" },
+      );
 
-      const integration = await Integration.findOne({
-        webhookUrl: `/webhook/${webhookId}`,
+      // Armazenar o token no Redis associado ao userId
+      await redisClient.set(user._id.toString(), token, {
+        EX: 3600, // Expiração em 1 hora
       });
-      if (!integration) {
-        res.status(404).send("Integração não encontrada");
-        return;
-      }
 
-      const activeCampaign = await Campaign.findOne({
-        integrationName: integration.name,
-        createdBy: integration.createdBy,
-        status: "active",
-      });
-      if (!activeCampaign) {
-        res.status(404).send("Nenhuma campanha ativa encontrada");
-        return;
-      }
-
-      // Substituir variáveis na mensagem template
-      let messageContent = activeCampaign.messageTemplate;
-      messageContent = messageContent
-        .replace("{{nome}}", nome)
-        .replace("{{telefone}}", telefone)
-        .replace("{{email}}", email);
-
-      // Enviar SMS através do utilitário
-      await sendSms(telefone, messageContent);
-
-      const responseStatus = "active";
-
-      // Salvar histórico da campanha
-      const campaignHistoryEntry = new CampaignHistory({
-        campaignId: activeCampaign._id,
-        responseStatus,
-        messageContent,
-      });
-      await campaignHistoryEntry.save();
-
-      res.status(200).send("SMS enviado com sucesso");
-    } catch (error) {
-      console.error("Erro ao processar webhook:", error);
-      res.status(500).send("Erro ao processar webhook");
+      res.json({ token });
+    } else {
+      res.status(401).send("Credenciais inválidas");
     }
-  },
-);
+  } catch (error) {
+    res.status(500).send("Erro no servidor");
+  }
+});
+
+// Rota para obter informações do usuário
+router.get("/user", authMiddleware, async (req, res, next) => {
+  try {
+    // Lógica adicional da rota após o middleware de autenticação
+    res.status(200).send("Token válido"); // Apenas um exemplo, ajuste conforme necessário
+  } catch (error) {
+    next(error);
+  }
+});
 
 export default router;

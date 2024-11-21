@@ -1,87 +1,47 @@
-import { Router, Request, Response } from "express";
+// src/routes/authRoutes.ts
+import express, { Request, Response, NextFunction } from "express";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 import { User } from "../models/User";
+import redisClient from "../utils/redisClient"; // Importar o Redis Client
+import authMiddleware from "../middleware/auth"; // Importar o middleware de autenticação
 
-const router = Router();
+const router = express.Router();
 
-router.get("/login", (req: Request, res: Response) => {
-  if (req.session.userId) {
-    return res.redirect("/");
-  }
-  res.render("login", { messages: req.flash() });
-});
-
+// Rota de Login
 router.post("/login", async (req: Request, res: Response) => {
   try {
     const { username, password } = req.body;
-
-    if (!username || !password) {
-      req.flash("error", "Username and password are required");
-      return res.redirect("/login");
-    }
-
     const user = await User.findOne({ username });
+    if (user && (await bcrypt.compare(password, user.password))) {
+      const token = jwt.sign(
+        { userId: user._id },
+        process.env.JWT_SECRET as string,
+        { expiresIn: "1h" },
+      );
 
-    if (user && (await user.checkPassword(password))) {
-      req.session.userId = user._id.toString(); // Convertendo _id para string
-      req.flash("success", "Login successful!");
-      return res.redirect("/");
+      // Armazenar o token no Redis associado ao userId
+      await redisClient.set(user._id.toString(), token, {
+        EX: 3600, // Expiração em 1 hora
+      });
+
+      res.json({ token });
+    } else {
+      res.status(401).send("Credenciais inválidas");
     }
-
-    req.flash("error", "Invalid username or password");
-    res.redirect("/login");
   } catch (error) {
-    console.error("Login error:", error);
-    req.flash("error", "An error occurred during login");
-    res.redirect("/login");
+    res.status(500).send("Erro no servidor");
   }
 });
 
-router.get("/register", (req: Request, res: Response) => {
-  if (req.session.userId) {
-    return res.redirect("/");
-  }
-  res.render("register", { messages: req.flash() });
-});
-
-router.post("/register", async (req: Request, res: Response) => {
+// Rota para obter informações do usuário
+router.get("/user", authMiddleware, async (req, res, next) => {
   try {
-    const { username, password } = req.body;
-
-    if (!username || !password) {
-      req.flash("error", "Username and password are required");
-      return res.redirect("/register");
-    }
-
-    const existingUser = await User.findOne({ username });
-    if (existingUser) {
-      req.flash("error", "Username already exists");
-      return res.redirect("/register");
-    }
-
-    // Create user with required fields
-    const user = new User({
-      username,
-      isAdmin: false,
-      credits: 0,
-    });
-
-    await user.setPassword(password);
-    await user.save();
-
-    req.session.userId = user._id.toString(); // Convertendo _id para string
-    req.flash("success", "Account created successfully!");
-    res.redirect("/");
+    // Lógica adicional da rota após o middleware de autenticação
+    res.status(200).send("Token válido"); // Apenas um exemplo, ajuste conforme necessário
   } catch (error) {
-    console.error("Registration error:", error);
-    req.flash("error", "An error occurred during registration");
-    res.redirect("/register");
+    next(error);
   }
-});
-
-router.get("/logout", (req: Request, res: Response) => {
-  req.session.destroy(() => {
-    res.redirect("/login");
-  });
 });
 
 export default router;
