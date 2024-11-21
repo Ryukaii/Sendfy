@@ -5,6 +5,7 @@ export interface IUser extends Document {
   _id: Types.ObjectId; // Especificando explicitamente que `_id` é do tipo `ObjectId`
   username: string;
   password: string;
+  email: { type: String; required: true };
   isAdmin: boolean;
   credits: number;
   setPassword(password: string): Promise<void>;
@@ -14,6 +15,7 @@ export interface IUser extends Document {
 const UserSchema = new Schema<IUser>({
   username: { type: String, required: true, unique: true },
   password: { type: String, required: true },
+  email: { type: String, required: true },
   isAdmin: { type: Boolean, default: false },
   credits: { type: Number, default: 0 },
 });
