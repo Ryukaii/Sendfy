@@ -1,6 +1,5 @@
-// src/routes/webhookRoutes.ts
 import express, { Request, Response } from "express";
-import axios from "axios";
+import { sendSms } from "../utils/smsUtils";
 import { Campaign } from "../models/Campaign";
 import { CampaignHistory } from "../models/CampaignHistory";
 import { Integration } from "../models/Integration";
@@ -40,20 +39,8 @@ router.post(
         .replace("{{telefone}}", telefone)
         .replace("{{email}}", email);
 
-      // Enviar SMS através da API
-      const smsApiUrl = "https://api.smsdev.com.br/v1/send";
-      const smsApiKey = process.env.SMS_API_KEY;
-      if (!smsApiKey) {
-        res.status(500).send("Chave da API de SMS não configurada");
-        return;
-      }
-
-      const response = await axios.post(smsApiUrl, {
-        key: smsApiKey,
-        type: 9,
-        number: telefone,
-        msg: messageContent,
-      });
+      // Enviar SMS através do utilitário
+      await sendSms(telefone, messageContent);
 
       const responseStatus = "active";
 

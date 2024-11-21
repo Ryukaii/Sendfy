@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "typeRoots": ["./node_modules/@types", "./types"],
     "target": "ES6", // Especifica a versão do JavaScript de saída
     "module": "commonjs", // Usa o sistema de módulo CommonJS, necessário para Node.js
     "rootDir": "src", // Diretório raiz dos arquivos TypeScript (código-fonte)
