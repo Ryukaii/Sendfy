@@ -32,7 +32,8 @@ app.use("/campaign", authenticate, campaignRoutes);
 app.use("/integration", authenticate, integrationRoutes);
 app.use("/", webhookRoutes); // Adiciona as rotas de webhooks
 
+const PORT = process.env.PORT || 3000;
 // Inicializando o servidor
-app.listen(3000, () => {
+app.listen(PORT, () => {
   console.log("Servidor rodando na porta 3000");
 });
