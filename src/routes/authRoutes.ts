@@ -7,12 +7,12 @@ import redisClient from "../utils/redisClient"; // Importar o Redis Client
 import authMiddleware from "../middleware/auth"; // Importar o middleware de autenticação
 
 const router = express.Router();
-
+//
 // Rota de Login
 router.post("/login", async (req: Request, res: Response) => {
   try {
-    const { username, password } = req.body;
-    const user = await User.findOne({ username });
+    const { email, password } = req.body; // Substituído 'username' por 'email'
+    const user = await User.findOne({ email }); // Buscar no banco de dados pelo e-mail
     if (user && (await bcrypt.compare(password, user.password))) {
       const token = jwt.sign(
         { userId: user._id },
