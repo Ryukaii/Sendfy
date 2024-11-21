@@ -1,71 +1,77 @@
-// src/routes/integrationRoutes.ts
-import express, { Request, Response } from "express";
+import express, { Request, Response, NextFunction } from "express";
 import { Integration } from "../models/Integration";
 
 const router = express.Router();
 
 // Obter todas as integrações do usuário logado
-router.get("/", async (req: Request, res: Response): Promise<void> => {
-  try {
-    if (!req.user?.userId) {
-      res.status(401).send("Usuário não autorizado");
-      return;
+router.get(
+  "/",
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!req.user?.userId) {
+        res.status(401).json({ error: "Usuário não autorizado" });
+        return;
+      }
+
+      const integrations = await Integration.find({
+        createdBy: req.user.userId,
+      });
+      res.status(200).json(integrations);
+    } catch (error) {
+      next(error); // Encaminhar erro para o middleware de erros
     }
+  },
+);
 
-    const integrations = await Integration.find({ createdBy: req.user.userId });
-    res.status(200).json(integrations);
-  } catch (error) {
-    res.status(500).send("Erro ao obter integrações");
-  }
-});
+// Criar uma nova integração
+router.post(
+  "/",
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { name } = req.body;
 
-router.post("/", async (req: Request, res: Response): Promise<void> => {
-  try {
-    console.log("Iniciando criação de integração"); // Log inicial
+      if (!req.user?.userId) {
+        res.status(401).json({ error: "Usuário não autorizado" });
+        return;
+      }
 
-    const { name } = req.body;
+      const integration = new Integration({
+        name,
+        createdBy: req.user.userId,
+      });
 
-    if (!req.user?.userId) {
-      console.error("Usuário não autorizado");
-      res.status(401).send("Usuário não autorizado");
-      return;
+      await integration.save();
+      res.status(201).json({
+        message: "Integração criada com sucesso",
+        webhookUrl: integration.webhookUrl,
+      });
+    } catch (error) {
+      next(error); // Encaminhar erro para o middleware de erros
     }
-
-    console.log("Usuário autorizado:", req.user.userId); // Log de autorização
-
-    const integration = new Integration({
-      name,
-      createdBy: req.user.userId,
-    });
-
-    await integration.save();
-    res.status(201).json({
-      message: "Integração criada com sucesso",
-      webhookUrl: integration.webhookUrl,
-    });
-  } catch (error) {
-    console.error("Erro ao criar integração:", error); // Log de erro
-    res.status(400).send("Erro ao criar integração");
-  }
-});
+  },
+);
 
 // Deletar integração
-router.delete("/:id", async (req: Request, res: Response): Promise<void> => {
-  try {
-    const integration = await Integration.findOne({
-      _id: req.params.id,
-      createdBy: req.user?.userId,
-    });
-    if (!integration) {
-      res.status(404).send("Integração não encontrada");
-      return; // Garante que a execução termine aqui
-    }
+router.delete(
+  "/:id",
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const integration = await Integration.findOne({
+        _id: req.params.id,
+        createdBy: req.user?.userId,
+      });
 
-    await Integration.findByIdAndDelete(req.params.id);
-    res.send("Integração deletada com sucesso");
-  } catch (error) {
-    res.status(500).send("Erro ao deletar integração");
-  }
-});
+      if (!integration) {
+        res.status(404).json({ error: "Integração não encontrada" });
+        return;
+      }
+
+      await Integration.findByIdAndDelete(req.params.id);
+      res.status(200).json({ message: "Integração deletada com sucesso" });
+    } catch (error) {
+      next(error); // Encaminhar erro para o middleware de erros
+    }
+  },
+);
 
 export default router;
