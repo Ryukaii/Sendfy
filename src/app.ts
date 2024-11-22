@@ -17,6 +17,7 @@ import campaignRoutes from "./routes/campaignRoutes";
 import integrationRoutes from "./routes/integrationRoutes";
 import webhookRoutes from "./routes/webhookRoutes";
 import sendSMSRoutes from "./routes/smsRoutes";
+import verifyJWT from "./routes/verify-jwt";
 
 // Carregar variáveis de ambiente
 dotenv.config();
@@ -43,6 +44,7 @@ app.use("/auth", authRoutes);
 app.use("/campaign", authenticate, campaignRoutes);
 app.use("/integration", authenticate, integrationRoutes);
 app.use("/sms", authenticate, sendSMSRoutes);
+app.use("/verify-jwt", authenticate, verifyJWT);
 app.use("/", webhookRoutes); // Adiciona as rotas de webhooks
 
 // Middleware de tratamento de erros (deve ser o último)
