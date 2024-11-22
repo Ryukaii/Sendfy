@@ -58,7 +58,6 @@ router.delete(
     try {
       const integration = await Integration.findOne({
         _id: req.params.id,
-        createdBy: req.user?.userId,
       });
 
       if (!integration) {
