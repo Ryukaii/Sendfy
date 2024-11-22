@@ -16,6 +16,7 @@ import authRoutes from "./routes/authRoutes";
 import campaignRoutes from "./routes/campaignRoutes";
 import integrationRoutes from "./routes/integrationRoutes";
 import webhookRoutes from "./routes/webhookRoutes";
+import sendSMSRoutes from "./routes/smsRoutes";
 
 // Carregar variáveis de ambiente
 dotenv.config();
@@ -41,6 +42,7 @@ mongoose
 app.use("/auth", authRoutes);
 app.use("/campaign", authenticate, campaignRoutes);
 app.use("/integration", authenticate, integrationRoutes);
+app.use("/sms", authenticate, sendSMSRoutes);
 app.use("/", webhookRoutes); // Adiciona as rotas de webhooks
 
 // Middleware de tratamento de erros (deve ser o último)
