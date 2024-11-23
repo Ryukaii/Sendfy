@@ -1,12 +1,12 @@
 import mongoose from "mongoose";
 
 const campaignSchema = new mongoose.Schema({
-  name: { type: String, required: true },
+  name: { type: String, required: true, unique: true },
   integrationName: { type: String, required: true },
   tipoEvento: { type: String, required: true },
   messageTemplate: { type: String, required: true },
   delay: {
-    time: { type: String, required: true },
+    time: { type: Number, required: true },
     counter: { type: String, required: true },
   },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },

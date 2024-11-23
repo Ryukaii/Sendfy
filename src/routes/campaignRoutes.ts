@@ -45,6 +45,34 @@ router.post(
     }
   },
 );
+//Atualiza Campanha
+router.put(
+  "/edit-campaign",
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.query;
+      const updateData = req.body;
+
+      if (!id) {
+        res.status(400).json({ error: "ID da campanha é obrigatório." });
+        return;
+      }
+
+      const updatedCampaign = await Campaign.findByIdAndUpdate(id, updateData, {
+        new: true,
+      });
+
+      if (!updatedCampaign) {
+        res.status(404).json({ error: "Campanha não encontrada." });
+        return;
+      }
+
+      res.status(200).json(updatedCampaign);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao editar a campanha." });
+    }
+  },
+);
 
 // Executar campanha
 router.post(
