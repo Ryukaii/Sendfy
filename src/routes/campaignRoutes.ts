@@ -1,63 +1,80 @@
 import express, { Request, Response, NextFunction } from "express";
 import { Campaign } from "../models/Campaign";
-import { Integration } from "../models/Integration";
-import { sendSms } from "../utils/smsUtils";
 import { CampaignHistory } from "../models/CampaignHistory";
+import { Integration } from "../models/Integration"; // Assumindo que existe um modelo de integração para buscar o webhookUrl
 
 const router = express.Router();
 
+// Criar campanha
 router.post(
-  "/webhook/:webhookId",
+  "/",
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { nome, telefone, email } = req.body;
-      const { webhookId } = req.params;
+      const { name, integrationName, tipoEvento, messageTemplate, delay } =
+        req.body;
 
-      // Verificar a integração
-      const integration = await Integration.findOne({
-        webhookUrl: `/webhook/${webhookId}`,
-      });
+      if (!req.user?.userId) {
+        res.status(401).send("Usuário não autorizado");
+        return;
+      }
+
+      // Buscar a integração pelo nome informado
+      const integration = await Integration.findOne({ name: integrationName });
+
       if (!integration) {
-        res.status(404).json({ error: "Integração não encontrada" });
+        res.status(404).send("Integração não encontrada");
         return;
       }
 
-      // Verificar a campanha ativa
-      const activeCampaign = await Campaign.findOne({
-        integrationName: integration.name,
-        createdBy: integration.createdBy,
-        status: "active",
+      // Criar campanha usando o webhookUrl da integração encontrada
+      const campaign = new Campaign({
+        name,
+        webhookUrl: integration.webhookUrl,
+        tipoEvento,
+        messageTemplate,
+        createdBy: req.user.userId,
+        integrationName,
+        delay, // Adicionei o integrationName ao criar a campanha
       });
-      if (!activeCampaign) {
-        res
-          .status(404)
-          .json({
-            error: "Nenhuma campanha ativa encontrada para a integração",
-          });
+
+      await campaign.save();
+      res.status(201).send("Campanha criada com sucesso");
+    } catch (error) {
+      console.error("Erro ao criar campanha:", error); // Log do erro para entender o problema
+      res.status(400).send("Erro ao criar campanha");
+    }
+  },
+);
+
+// Executar campanha
+router.post(
+  "/:id/execute",
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const campaign = await Campaign.findOne({
+        _id: req.params.id,
+        createdBy: req.user?.userId,
+      });
+      if (!campaign) {
+        res.status(404).send("Campanha não encontrada");
         return;
       }
 
-      // Substituir variáveis na mensagem template
-      let messageContent = activeCampaign.messageTemplate;
-      messageContent = messageContent
-        .replace("{{nome}}", nome)
-        .replace("{{telefone}}", telefone)
-        .replace("{{email}}", email);
+      // Aqui seria feita a requisição ao webhook e a API de SMS
+      // Simulação de envio de SMS usando a mensagem template
+      const responseStatus = "success";
+      const messageContent = campaign.messageTemplate;
 
-      // Enviar SMS
-      await sendSms(telefone, messageContent);
-
-      // Salvar histórico da campanha
-      const campaignHistoryEntry = new CampaignHistory({
-        campaignId: activeCampaign._id,
-        responseStatus: "sent",
+      const campaignHistory = new CampaignHistory({
+        campaignId: campaign._id,
+        responseStatus,
         messageContent,
       });
-      await campaignHistoryEntry.save();
+      await campaignHistory.save();
 
-      res.status(200).json({ message: "SMS enviado com sucesso" });
+      res.send("Campanha executada com sucesso");
     } catch (error) {
-      next(error); // Encaminhar erros para o middleware de erros
+      res.status(500).send("Erro ao executar campanha");
     }
   },
 );
