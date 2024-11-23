@@ -74,6 +74,28 @@ router.put(
   },
 );
 
+//Delete campanha
+router.delete(
+  "/:id",
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const integration = await Campaign.findOne({
+        _id: req.params.id,
+      });
+
+      if (!integration) {
+        res.status(404).json({ error: "Campanha não encontrada" });
+        return;
+      }
+
+      await Campaign.findByIdAndDelete(req.params.id);
+      res.status(200).json({ message: "Campanha deletada com sucesso" });
+    } catch (error) {
+      next(error); // Encaminhar erro para o middleware de erros
+    }
+  },
+);
+
 // Executar campanha
 router.post(
   "/:id/execute",
