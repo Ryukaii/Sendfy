@@ -12,6 +12,7 @@ const campaignHistorySchema = new mongoose.Schema({
   messageContent: String,
   phone: String,
   type: String,
+  transaction_id: String,
 });
 
 export const CampaignHistory = mongoose.model(
