@@ -5,9 +5,9 @@ import { Campaign } from "../models/Campaign";
 import { CampaignHistory } from "../models/CampaignHistory";
 import { Integration } from "../models/Integration";
 import { User } from "../models/User";
+import { sendSms } from "../utils/smsUtils";
 
 const router = express.Router();
-
 // Middleware para verificar se o usuário é administrador
 const isAdmin = async (req: Request, res: Response, next: Function) => {
   try {
@@ -121,19 +121,7 @@ router.post(
         .replace("{{email}}", email);
 
       // Enviar SMS através da API
-      const smsApiUrl = "https://api.smsdev.com.br/v1/send";
-      const smsApiKey = process.env.SMS_API_KEY;
-      if (!smsApiKey) {
-        res.status(500).send("Chave da API de SMS não configurada");
-        return;
-      }
-
-      const response = await axios.post(smsApiUrl, {
-        key: smsApiKey,
-        type: 9,
-        number: telefone,
-        msg: messageContent,
-      });
+      const smsResponse = await sendSms(telefone, messageContent);
 
       // Se o envio do SMS for bem-sucedido, descontar 1 crédito do usuário
       user.credits -= 1;
@@ -141,11 +129,17 @@ router.post(
 
       const responseStatus = "success";
 
+      console.log("Usuário (createdBy):", user._id);
+      console.log(user);
+
       // Salvar histórico da campanha
       const campaignHistoryEntry = new CampaignHistory({
         campaignId: activeCampaign._id,
         responseStatus,
         messageContent,
+        phone: telefone,
+        type: "sms",
+        createdBy: user._id,
       });
       await campaignHistoryEntry.save();
 
