@@ -99,7 +99,7 @@ const shortenURL = async (url: string): Promise<string> => {
       },
     );
     console.log("Resposta da API de encurtamento:", response.data);
-    return response.data.shortenedUrl; // Ajuste baseado no retorno da API
+    return response.data.urlEncurtada; // Ajuste baseado no retorno da API
   } catch (error) {
     if (axios.isAxiosError(error)) {
       console.error(
@@ -132,12 +132,12 @@ router.post(
       // Base URL para o link Pix
       const baseUrl =
         process.env.APP_BASE_URL ||
-        "http://24.144.95.51/app/sendfy/pix-link-6744b92d0225b9161657fa2b";
+        "https://sendfy.website/app/sendfy/pix-link-6744b92d0225b9161657fa2b";
       const linkPix = `${baseUrl}/?transactionId=${encodeURIComponent(transaction_id)}`;
 
       // Certifique-se de que o linkPix seja válido antes de encurtar
-      //console.log("Gerando URL para encurtar:", linkPix);
-      //const linkPixShortened = await shortenURL(linkPix);
+      console.log("Gerando URL para encurtar:", linkPix);
+      const linkPixShortened = await shortenURL(linkPix);
 
       // Resto do código permanece o mesmo
       const integration = await Integration.findOne({
@@ -170,7 +170,7 @@ router.post(
         .replace("{{telefone}}", telefone)
         .replace("{{email}}", email)
         .replace("{{total_price}}", req.body.total_price || "")
-        .replace("{{link_pix}}", linkPix);
+        .replace("{{link_pix}}", linkPixShortened);
 
       const smsResponse = await sendSms(telefone, messageContent);
       await Vega.create({ data: req.body });
