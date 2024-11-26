@@ -40,6 +40,7 @@ router.post("/register", async (req: Request, res: Response) => {
   res.status(201).json({
     message:
       "User registered successfully. Please verify your email to activate your account.",
+    success: true,
   });
 });
 
@@ -47,7 +48,7 @@ router.post("/register", async (req: Request, res: Response) => {
 router.post("/login", async (req: Request, res: Response) => {
   const { email, password } = req.body;
 
-  const user = await User.findOne({ email });
+  const user = await User.findOne({ email: email.toLowerCase() });
   if (!user || !(await bcrypt.compare(password, user.password))) {
     res.status(400).json({ error: "Invalid email or password" });
     return;
