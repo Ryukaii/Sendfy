@@ -19,7 +19,7 @@ router.post("/register", async (req: Request, res: Response) => {
 
   const existingUser = await User.findOne({ email });
   if (existingUser) {
-    res.status(400).json({ error: "Email already in use" });
+    res.status(400).json({ error: "Email already in use", status: "email" });
     return;
   }
 
@@ -40,7 +40,7 @@ router.post("/register", async (req: Request, res: Response) => {
   res.status(201).json({
     message:
       "User registered successfully. Please verify your email to activate your account.",
-    success: true,
+    status: "success",
   });
 });
 
