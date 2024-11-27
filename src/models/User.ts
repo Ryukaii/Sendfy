@@ -48,10 +48,24 @@ UserSchema.pre("save", async function (next) {
 
 // Método para gerar token de verificação
 UserSchema.methods.generateVerificationToken =
-  async function (): Promise<void> {
+  async function (): Promise<string> {
     const crypto = require("crypto");
-    this.verificationToken = crypto.randomBytes(32).toString("hex");
+
+    // Gera o token bruto
+    const rawToken = crypto.randomBytes(32).toString("hex");
+
+    // Hash do token bruto
+    const hashedToken = await bcrypt.hash(rawToken, 10);
+
+    // Salva o hash e a expiração no documento
+    this.verificationToken = hashedToken;
     this.expiresat = new Date(Date.now() + 24 * 60 * 60 * 1000); // Expira em 24 horas
+
+    console.log("Token bruto enviado ao cliente:", rawToken);
+    console.log("Hash armazenado no banco:", hashedToken);
+
+    // Retorna o token bruto para envio no link de verificação
+    return rawToken;
   };
 
 // Método para definir a senha

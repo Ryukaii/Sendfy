@@ -34,11 +34,8 @@ router.post("/register", async (req: Request, res: Response) => {
   });
 
   // Gerar o token de verificação
-  const rawToken = crypto.randomBytes(32).toString("hex"); // Token antes de ser hashado
-  const hashedToken = await bcrypt.hash(rawToken, 10); // Hash do token para salvar no banco
-  console.log(rawToken);
   // Gerar token de verificação
-  await newUser.generateVerificationToken();
+  const rawToken = await newUser.generateVerificationToken();
   await newUser.save();
 
   // Opcional: Enviar e-mail de verificação (implementar lógica de envio)
@@ -49,8 +46,8 @@ router.post("/register", async (req: Request, res: Response) => {
     status: "success",
   });
 
-  const baseURL = process.env.BASE_URL || "http://localhost:3000";
-  const linkAut = `${baseURL}/verify-email?hash=${rawToken}&email=${email}`;
+  const baseURL = process.env.BASE_URL || "https://api.sendfy.website/";
+  const linkAut = `${baseURL}/verify?hash=${rawToken}&email=${email}`;
 
   const htmlContent = `<!DOCTYPE html>
   <html lang="pt-BR">
@@ -172,38 +169,58 @@ router.get("/user", async (req: Request, res: Response, next: NextFunction) => {
 });
 
 // Nova rota para verificar o token de verificação do usuário
-router.post("/verify", async (req: Request, res: Response) => {
-  const { email, token } = req.body;
+router.get(
+  "/verify",
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      // Extraia e valide `token` e `email` dos parâmetros da URL
+      const token = req.query.token as string | undefined;
+      const email = req.query.email as string | undefined;
 
-  const user = await User.findOne({ email });
-  if (!user) {
-    res.status(404).json({ error: "User not found" });
-    return;
-  }
+      console.log("Token recebido na verificação:", token);
 
-  // Verificar se o token de verificação expirou
-  if (Date.now() > new Date(user.expiresat).getTime()) {
-    res
-      .status(400)
-      .json({ error: "Verification token expired. Please request a new one." });
-    return;
-  }
+      // Verifique se `token` e `email` estão presentes
+      if (!token || !email) {
+        res.status(400).json({ error: "Email and token are required." });
+        return;
+      }
 
-  // Verificar se o token de verificação é válido
-  const isValidToken = await bcrypt.compare(token, user.verificationToken);
-  if (!isValidToken) {
-    res.status(400).json({ error: "Invalid verification token" });
-    return;
-  }
+      // Buscar o usuário pelo e-mail
+      const user = await User.findOne({ email });
+      if (!user) {
+        res.status(404).json({ error: "User not found." });
+        return;
+      }
 
-  // Atualizar o status do usuário para verificado
-  user.isVerified = true;
-  user.verificationToken = ""; // Limpar token
-  await user.save();
+      // Verificar se o token expirou
+      if (Date.now() > new Date(user.expiresat).getTime()) {
+        res.status(400).json({
+          error: "Verification token expired. Please request a new one.",
+        });
+        return;
+      }
 
-  res
-    .status(200)
-    .json({ message: "Account verified successfully. You can now log in." });
-});
+      // Verificar se o token é válido
+      const isValidToken = await bcrypt.compare(token, user.verificationToken);
+      if (!isValidToken) {
+        res.status(400).json({ error: "Invalid verification token." });
+        return;
+      }
+
+      // Atualizar o status do usuário
+      user.isVerified = true;
+      user.verificationToken = ""; // Limpar o token
+      await user.save();
+
+      // Redirecionar para a página de confirmação
+      res.redirect(
+        "https://sendfy.website/app/sendfy/confirmacao-67460c3e9a06110fcef20011",
+      );
+    } catch (error) {
+      console.error("Erro na verificação:", error);
+      res.status(500).json({ error: "Internal server error." });
+    }
+  },
+);
 
 export default router;
