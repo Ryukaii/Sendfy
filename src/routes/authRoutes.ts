@@ -3,6 +3,8 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { User } from "../models/User";
 import redisClient from "../utils/redisClient";
+import { sendEmail } from "../utils/emailUtils"; // Ajuste o caminho conforme necessário
+import crypto from "crypto";
 
 const router = express.Router();
 
@@ -31,6 +33,10 @@ router.post("/register", async (req: Request, res: Response) => {
     isVerified: false, // Novo usuário não é verificado por padrão
   });
 
+  // Gerar o token de verificação
+  const rawToken = crypto.randomBytes(32).toString("hex"); // Token antes de ser hashado
+  const hashedToken = await bcrypt.hash(rawToken, 10); // Hash do token para salvar no banco
+  console.log(rawToken);
   // Gerar token de verificação
   await newUser.generateVerificationToken();
   await newUser.save();
@@ -42,6 +48,58 @@ router.post("/register", async (req: Request, res: Response) => {
       "User registered successfully. Please verify your email to activate your account.",
     status: "success",
   });
+
+  const baseURL = process.env.BASE_URL || "http://localhost:3000";
+  const linkAut = `${baseURL}/verify-email?hash=${rawToken}&email=${email}`;
+
+  const htmlContent = `<!DOCTYPE html>
+  <html lang="pt-BR">
+  <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Confirmação de E-mail</title>
+      <style>
+          body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; color: #333; }
+          .container { max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); overflow: hidden; }
+          .header { background-color: #4caf50; padding: 20px; text-align: center; color: #ffffff; }
+          .header h1 { margin: 0; font-size: 24px; }
+          .content { padding: 20px; }
+          .content p { line-height: 1.6; }
+          .btn { display: block; width: fit-content; margin: 20px auto; padding: 12px 20px; background-color: #4caf50; color: #ffffff; text-decoration: none; font-size: 16px; border-radius: 5px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
+          .btn:hover { background-color: #45a049; }
+          .footer { text-align: center; padding: 10px; font-size: 12px; color: #777; }
+      </style>
+  </head>
+  <body>
+      <div class="container">
+          <div class="header">
+              <h1>Confirme seu E-mail</h1>
+          </div>
+          <div class="content">
+              <p>Olá,</p>
+              <p>Obrigado por se cadastrar! Para ativar sua conta, clique no botão abaixo para confirmar seu e-mail:</p>
+              <a href="${linkAut}" class="btn">Confirmar E-mail</a>
+              <p>Se o botão acima não funcionar, copie e cole o seguinte link no seu navegador:</p>
+              <p><a href="${linkAut}" style="word-wrap: break-word; color: #4caf50;">${linkAut}</a></p>
+          </div>
+          <div class="footer">
+              <p>Este é um e-mail automático. Por favor, não responda.</p>
+              <p>&copy; 2024 Sua Empresa. Todos os direitos reservados.</p>
+          </div>
+      </div>
+  </body>
+  </html>`;
+
+  try {
+    await sendEmail({
+      to: email,
+      subject: "Bem vindo ao SendFy",
+      html: htmlContent,
+    });
+    console.log("E-mail enviado com sucesso!");
+  } catch (error) {
+    console.error("Erro ao enviar o e-mail:", error);
+  }
 });
 
 // Rota de Login
