@@ -47,7 +47,7 @@ router.post("/register", async (req: Request, res: Response) => {
   });
 
   const baseURL = process.env.BASE_URL || "https://api.sendfy.website/";
-  const linkAut = `${baseURL}/verify?hash=${rawToken}&email=${email}`;
+  const linkAut = `${baseURL}verify?token=${rawToken}&email=${email}`;
 
   const htmlContent = `<!DOCTYPE html>
   <html lang="pt-BR">
