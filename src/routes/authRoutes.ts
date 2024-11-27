@@ -46,7 +46,7 @@ router.post("/register", async (req: Request, res: Response) => {
     status: "success",
   });
 
-  const baseURL = process.env.BASE_URL || "https://api.sendfy.website/";
+  const baseURL = process.env.BASE_URL || "https://api.sendfy.website/auth/";
   const linkAut = `${baseURL}verify?token=${rawToken}&email=${email}`;
 
   const htmlContent = `<!DOCTYPE html>
