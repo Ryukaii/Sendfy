@@ -8,13 +8,13 @@ router.get(
   "/",
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      if (!req.user?.userId) {
+      if (!req.query.userId) {
         res.status(401).json({ error: "Usuário não autorizado" });
         return;
       }
 
       const integrations = await Integration.find({
-        createdBy: req.user.userId,
+        createdBy: req.query.userId,
       });
       res.status(200).json(integrations);
     } catch (error) {
