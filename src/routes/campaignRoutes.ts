@@ -5,6 +5,25 @@ import { Integration } from "../models/Integration"; // Assumindo que existe um 
 
 const router = express.Router();
 
+router.get(
+  "/",
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!req.query.userId) {
+        res.status(401).json({ error: "Usuário não autorizado" });
+        return;
+      }
+
+      const campaings = await Integration.find({
+        createdBy: req.query.userId,
+      });
+      res.status(200).json(campaings);
+    } catch (error) {
+      next(error); // Encaminhar erro para o middleware de erros
+    }
+  },
+);
+
 // Criar campanha
 router.post(
   "/",
@@ -113,7 +132,7 @@ router.post(
       // Aqui seria feita a requisição ao webhook e a API de SMS
       // Simulação de envio de SMS usando a mensagem template
       const responseStatus = "success";
-      const messageContent = campaign.messageTemplate;
+      const messageContent = campaign.messages;
 
       const campaignHistory = new CampaignHistory({
         campaignId: campaign._id,

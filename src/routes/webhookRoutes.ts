@@ -5,8 +5,12 @@ import { Campaign } from "../models/Campaign";
 import { CampaignHistory } from "../models/CampaignHistory";
 import { Integration } from "../models/Integration";
 import { User } from "../models/User";
+import { ScheduledMessage } from "../models/ScheduledMessage";
 import { sendSms } from "../utils/smsUtils";
 import { Vega } from "../models/Vega";
+import { schedulerService } from "../services/schedulerService";
+import { IScheduledMessage } from "../types/scheduledMessage";
+import mongoose from "mongoose";
 
 const router = express.Router();
 // Middleware para verificar se o usuário é administrador
@@ -164,34 +168,98 @@ router.post(
         return;
       }
 
-      let messageContent = activeCampaign.messageTemplate;
-      messageContent = messageContent
-        .replace("{{nome}}", nome)
-        .replace("{{telefone}}", telefone)
-        .replace("{{email}}", email)
-        .replace("{{total_price}}", req.body.total_price || "")
-        .replace("{{link_pix}}", linkPixShortened);
+      // Assumindo que activeCampaign.messages é um array de objetos de mensagem
 
-      const smsResponse = await sendSms(telefone, messageContent);
-      await Vega.create({ data: req.body });
+      // Função para substituir placeholders em uma única mensagem
+      function replaceMessagePlaceholders(
+        messageContent: string,
+        data: {
+          nome: string;
+          telefone: string;
+          email: string;
+          total_price?: string;
+          linkPixShortened: string;
+        },
+      ): string {
+        return messageContent
+          .replace("{{nome}}", data.nome)
+          .replace("{{telefone}}", data.telefone)
+          .replace("{{email}}", data.email)
+          .replace("{{total_price}}", data.total_price || "")
+          .replace("{{link_pix}}", data.linkPixShortened);
+      }
 
-      user.credits -= 1;
-      await user.save();
+      function getMilliseconds(counter: string): number {
+        switch (counter) {
+          case "minutes":
+            return 60 * 1000;
+          case "hours":
+            return 60 * 60 * 1000;
+          case "days":
+            return 24 * 60 * 60 * 1000;
+          default:
+            return 0;
+        }
+      }
 
-      const responseStatus = "success";
+      // Iterando sobre todas as mensagens da campanha
+      const processedMessages = activeCampaign.messages.map((message) => {
+        const processedContent = replaceMessagePlaceholders(
+          message.messageTemplate,
+          {
+            nome,
+            telefone,
+            email,
+            total_price: req.body.total_price,
+            linkPixShortened,
+          },
+        );
 
-      const campaignHistoryEntry = new CampaignHistory({
-        campaignId: activeCampaign._id,
-        responseStatus,
-        messageContent,
-        phone: telefone,
-        type: "sms",
-        createdBy: user._id,
-        transaction_id,
+        const scheduledTime = new Date(
+          Date.now() +
+            (message.delay?.time ?? 0) *
+              getMilliseconds(message.delay?.counter ?? "minutes"),
+        );
+
+        return {
+          messageTemplate: processedContent,
+          scheduledTime,
+        };
       });
-      await campaignHistoryEntry.save();
 
-      res.status(200).send("SMS enviado com sucesso");
+      for (const message of processedMessages) {
+        const campaignHistory = new CampaignHistory({
+          campaignId: activeCampaign._id,
+          message: message.messageTemplate,
+          scheduledTime: message.scheduledTime,
+          recipient: telefone,
+          integrationId: integration._id,
+        });
+        await campaignHistory.save();
+
+        // Before creating the scheduledMessage
+        const scheduledMessage = await ScheduledMessage.create({
+          campaignId:
+            campaignHistory.campaignId ?? new mongoose.Types.ObjectId(),
+          phone: campaignHistory.phone ?? "",
+          content: campaignHistory.messageContent ?? "",
+          scheduledTime: campaignHistory.executedAt,
+          transactionId: campaignHistory.transaction_id ?? "",
+          createdBy: campaignHistory.createdBy ?? new mongoose.Types.ObjectId(),
+        });
+
+        const plainScheduledMessage: IScheduledMessage = {
+          ...scheduledMessage.toObject(),
+          createdBy:
+            scheduledMessage.createdBy ?? new mongoose.Types.ObjectId(),
+        };
+
+        await schedulerService.scheduleMessage(plainScheduledMessage);
+      }
+
+      user.credits -= processedMessages.length;
+      await user.save();
+      res.status(200).send("mensagens agendadas com sucesso");
     } catch (error) {
       console.error("Erro ao processar webhook:", error);
       res.status(500).send("Erro ao processar webhook");

@@ -27,6 +27,7 @@
     "flash": "^1.1.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.8.1",
+    "node-cron": "^3.0.3",
     "nodemailer": "^6.9.16",
     "redis": "^4.7.0",
     "uuid": "^11.0.3"
@@ -39,6 +40,7 @@
     "@types/express-ejs-layouts": "^2.5.4",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22.9.0",
+    "@types/node-cron": "^3.0.11",
     "@types/nodemailer": "^6.4.17",
     "@types/redis": "^4.0.10",
     "ts-node": "^10.9.2",

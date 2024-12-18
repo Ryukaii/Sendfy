@@ -4,6 +4,7 @@ import bodyParser from "body-parser";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
 import "express-async-errors";
+import { schedulerService } from "./services/schedulerService";
 
 import { Request, Response, NextFunction } from "express";
 
@@ -40,14 +41,19 @@ mongoose
     console.error("Erro ao conectar ao MongoDB:", error);
   });
 
+async function startServer() {
+  await schedulerService.loadScheduledMessages();
+}
+startServer();
+
 // Configurar rotas
 app.use("/auth", authRoutes);
 app.use("/campaign", authenticate, campaignRoutes);
 app.use("/integration", authenticate, integrationRoutes);
-app.use("/sms", authenticate, sendSMSRoutes);
-app.use("/verify-jwt", authenticate, verifyJWT);
+app.use("/sms", sendSMSRoutes);
+app.use("/verify-jwt", verifyJWT);
 app.use("/payment", payment);
-app.use("/", webhookRoutes); // Adiciona as rotas de webhooks
+app.use("/api", webhookRoutes); // Adiciona as rotas de webhooks
 
 // Middleware de tratamento de erros (deve ser o último)
 app.use(errorHandler);
