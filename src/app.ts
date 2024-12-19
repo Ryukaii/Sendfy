@@ -6,8 +6,6 @@ import mongoose from "mongoose";
 import "express-async-errors";
 import { schedulerService } from "./services/schedulerService";
 
-import { Request, Response, NextFunction } from "express";
-
 // Middlewares
 import authenticate from "./middleware/auth";
 import { errorHandler } from "./middleware/errors";

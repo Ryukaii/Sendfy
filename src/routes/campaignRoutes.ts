@@ -29,57 +29,55 @@ router.post(
   "/",
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { name, integrationName, tipoEvento, messageTemplate, delay } =
-        req.body;
+      const { name, integrationName, tipoEvento, messages, status } = req.body;
 
       if (!req.user?.userId) {
         res.status(401).send("Usuário não autorizado");
         return;
       }
 
-      // Buscar a integração pelo nome informado
       const integration = await Integration.findOne({ name: integrationName });
-
       if (!integration) {
         res.status(404).send("Integração não encontrada");
         return;
       }
 
-      // Criar campanha usando o webhookUrl da integração encontrada
       const campaign = new Campaign({
         name,
-        webhookUrl: integration.webhookUrl,
-        tipoEvento,
-        messageTemplate,
-        createdBy: req.user.userId,
         integrationName,
-        delay, // Adicionei o integrationName ao criar a campanha
+        tipoEvento,
+        messages,
+        createdBy: req.user.userId,
+        status: status || "pending",
       });
 
       await campaign.save();
       res.status(201).send("Campanha criada com sucesso");
     } catch (error) {
-      console.error("Erro ao criar campanha:", error); // Log do erro para entender o problema
+      console.error("Erro ao criar campanha:", error);
       res.status(400).send("Erro ao criar campanha");
     }
   },
 );
+
 //Atualiza Campanha
 router.put(
   "/edit-campaign",
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.query;
-      const updateData = req.body;
+      const { name, integrationName, tipoEvento, messages, status } = req.body;
 
       if (!id) {
         res.status(400).json({ error: "ID da campanha é obrigatório." });
         return;
       }
 
-      const updatedCampaign = await Campaign.findByIdAndUpdate(id, updateData, {
-        new: true,
-      });
+      const updatedCampaign = await Campaign.findByIdAndUpdate(
+        id,
+        { name, integrationName, tipoEvento, messages, status },
+        { new: true },
+      );
 
       if (!updatedCampaign) {
         res.status(404).json({ error: "Campanha não encontrada." });
@@ -89,28 +87,6 @@ router.put(
       res.status(200).json(updatedCampaign);
     } catch (error) {
       res.status(500).json({ error: "Erro ao editar a campanha." });
-    }
-  },
-);
-
-//Delete campanha
-router.delete(
-  "/:id",
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const integration = await Campaign.findOne({
-        _id: req.params.id,
-      });
-
-      if (!integration) {
-        res.status(404).json({ error: "Campanha não encontrada" });
-        return;
-      }
-
-      await Campaign.findByIdAndDelete(req.params.id);
-      res.status(200).json({ message: "Campanha deletada com sucesso" });
-    } catch (error) {
-      next(error); // Encaminhar erro para o middleware de erros
     }
   },
 );
