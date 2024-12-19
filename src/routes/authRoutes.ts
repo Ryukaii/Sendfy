@@ -105,7 +105,7 @@ router.post("/login", async (req: Request, res: Response) => {
 
   const user = await User.findOne({ email: email.toLowerCase() });
   if (!user || !(await bcrypt.compare(password, user.password))) {
-    res.status(400).json({ error: "Invalid email or password" });
+    res.status(401).json({ error: "Credenciais inválidas" });
     return;
   }
 
@@ -123,9 +123,17 @@ router.post("/login", async (req: Request, res: Response) => {
     process.env.JWT_SECRET as string,
     { expiresIn: "1h" },
   );
-  await redisClient.set(user._id.toString(), token, { EX: 3600 });
 
-  res.json({ token, userId: user._id });
+  const refreshToken = jwt.sign(
+    { userId: user._id },
+    process.env.REFRESH_TOKEN_SECRET as string,
+    { expiresIn: "7d" },
+  );
+
+  await redisClient.set(user._id.toString(), token, { EX: 3600 });
+  await redisClient.set(`refresh_${user._id}`, refreshToken);
+
+  res.json({ token, refreshToken, userId: user._id, expiresIn: 3600 });
 });
 
 // Rota para verificar token JWT e obter dados do usuário
@@ -222,5 +230,39 @@ router.get(
     }
   },
 );
+
+router.post("/refresh-token", async (req: Request, res: Response) => {
+  const { refreshToken } = req.body;
+
+  try {
+    const decoded = jwt.verify(
+      refreshToken,
+      process.env.REFRESH_TOKEN_SECRET as string,
+    ) as any;
+    const storedRefreshToken = await redisClient.get(
+      `refresh_${decoded.userId}`,
+    );
+
+    if (!storedRefreshToken || storedRefreshToken !== refreshToken) {
+      res.status(401).json({ error: "Refresh token inválido" });
+      return;
+    }
+
+    const newAccessToken = jwt.sign(
+      { userId: decoded.userId },
+      process.env.JWT_SECRET as string,
+      { expiresIn: "1h" },
+    );
+
+    await redisClient.set(decoded.userId, newAccessToken);
+
+    res.json({
+      accessToken: newAccessToken,
+      expiresIn: 3600,
+    });
+  } catch (error) {
+    res.status(401).json({ error: "Token inválido ou expirado" });
+  }
+});
 
 export default router;

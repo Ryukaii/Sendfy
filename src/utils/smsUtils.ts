@@ -11,11 +11,11 @@ export const sendSms = async (
     throw new Error("Chave da API de SMS não configurada");
   }
 
-  await axios.post(smsApiUrl, {
+  const response = await axios.post(smsApiUrl, {
     key: smsApiKey,
     type: 9,
     number: telefone,
     msg: messageContent,
   });
-  console.log(messageContent);
+  console.log(response.data);
 };

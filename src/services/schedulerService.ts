@@ -1,8 +1,8 @@
 import cron from "node-cron";
 import { IScheduledMessage } from "../types/scheduledMessage";
-import { sendSms } from "../utils/smsUtils"; // Ajuste o caminho conforme necessário
-import { CampaignHistory } from "../models/CampaignHistory"; // Importe o modelo CampaignHistory
-import { ScheduledMessage } from "../models/ScheduledMessage"; // Importe o modelo ScheduledMessage
+import { sendSms } from "../utils/smsUtils";
+import { CampaignHistory } from "../models/CampaignHistory";
+import { ScheduledMessage } from "../models/ScheduledMessage";
 import mongoose from "mongoose";
 
 export class SchedulerService {
@@ -14,74 +14,56 @@ export class SchedulerService {
       createdBy: message.createdBy ?? new mongoose.Types.ObjectId(),
     };
 
-    const {
-      campaignId,
-      phone,
-      content,
-      scheduledTime,
-      transactionId,
-      createdBy,
-    } = message;
+    const { scheduledTime } = safeMessage;
 
     const job = cron.schedule(
       this.dateToCronExpression(scheduledTime),
       async () => {
-        await this.executeScheduledMessage(message);
+        await this.executeScheduledMessage(safeMessage);
       },
       {
         scheduled: true,
-        timezone: "UTC", // Ajuste o fuso horário conforme necessário
+        timezone: "America/Sao_Paulo",
       },
     );
 
-    const campaignHistory = new CampaignHistory({
-      campaignId,
-      createdBy,
-      messageContent: content,
-      phone,
-      transaction_id: transactionId,
-      type: "scheduled", // ou outro tipo apropriado
-    });
-
-    await campaignHistory.save();
-    this.jobs.set(campaignHistory._id.toString(), job);
+    this.jobs.set(safeMessage.transactionId, job);
   }
 
   private async executeScheduledMessage(
     message: IScheduledMessage,
   ): Promise<void> {
-    const { phone, content, transactionId } = message;
+    const { campaignId, phone, content, transactionId, createdBy } = message;
+
     try {
       await sendSms(phone, content);
-      const campaignHistory = await CampaignHistory.findOneAndUpdate(
-        { transaction_id: transactionId },
-        {
-          $set: {
-            responseStatus: "sent",
-            executedAt: new Date(),
-          },
-        },
-        { new: true },
-      );
 
-      if (campaignHistory) {
-        const job = this.jobs.get(campaignHistory._id.toString());
-        if (job) {
-          job.stop();
-          this.jobs.delete(campaignHistory._id.toString());
-        }
+      await CampaignHistory.create({
+        campaignId,
+        message: content,
+        executedAt: new Date(),
+        recipient: phone,
+        createdBy,
+        responseStatus: "sent",
+      });
+
+      await ScheduledMessage.findOneAndDelete({ transactionId });
+
+      const job = this.jobs.get(transactionId);
+      if (job) {
+        job.stop();
+        this.jobs.delete(transactionId);
       }
     } catch (error) {
       console.error(`Erro ao enviar SMS agendado: ${error}`);
-      await CampaignHistory.findOneAndUpdate(
-        { transaction_id: transactionId },
-        {
-          $set: {
-            responseStatus: "failed",
-            executedAt: new Date(),
-          },
-        },
-      );
+      await CampaignHistory.create({
+        campaignId,
+        message: content,
+        executedAt: new Date(),
+        recipient: phone,
+        createdBy,
+        responseStatus: "failed",
+      });
     }
   }
 
@@ -90,7 +72,7 @@ export class SchedulerService {
       scheduledTime: { $gt: new Date() },
     });
     for (const message of messages) {
-      await this.scheduleMessage(toScheduledMessage(message));
+      await this.scheduleMessage(this.toScheduledMessage(message));
     }
   }
 
@@ -103,22 +85,32 @@ export class SchedulerService {
     const minutes = date.getMinutes();
     const hours = date.getHours();
     const dayOfMonth = date.getDate();
-    const month = date.getMonth() + 1; // getMonth() retorna 0-11
+    const month = date.getMonth() + 1;
     const dayOfWeek = date.getDay();
-
     return `${minutes} ${hours} ${dayOfMonth} ${month} ${dayOfWeek}`;
   }
-}
 
-function toScheduledMessage(doc: any): IScheduledMessage {
-  return {
-    campaignId: doc.campaignId,
-    phone: doc.phone,
-    content: doc.content,
-    scheduledTime: doc.scheduledTime,
-    transactionId: doc.transactionId,
-    createdBy: doc.createdBy ?? new mongoose.Types.ObjectId(),
-  };
+  private toScheduledMessage(doc: any): IScheduledMessage {
+    return {
+      campaignId: doc.campaignId,
+      phone: doc.phone,
+      content: doc.content,
+      scheduledTime: doc.scheduledTime,
+      transactionId: doc.transactionId,
+      createdBy: doc.createdBy ?? new mongoose.Types.ObjectId(),
+    };
+  }
+
+  async processScheduledMessages(): Promise<void> {
+    const now = new Date();
+    const messagesToSend = await ScheduledMessage.find({
+      scheduledTime: { $lte: now },
+    });
+
+    for (const message of messagesToSend) {
+      await this.executeScheduledMessage(this.toScheduledMessage(message));
+    }
+  }
 }
 
 export const schedulerService = new SchedulerService();
