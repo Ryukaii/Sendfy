@@ -17,4 +17,5 @@ export const sendSms = async (
     number: telefone,
     msg: messageContent,
   });
+  console.log(messageContent);
 };

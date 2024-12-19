@@ -1,87 +1,226 @@
-import { Router, Request, Response } from "express";
+import express, { Request, Response, NextFunction } from "express";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 import { User } from "../models/User";
+import redisClient from "../utils/redisClient";
+import { sendEmail } from "../utils/emailUtils"; // Ajuste o caminho conforme necessário
+import crypto from "crypto";
 
-const router = Router();
+const router = express.Router();
 
-router.get("/login", (req: Request, res: Response) => {
-  if (req.session.userId) {
-    return res.redirect("/");
-  }
-  res.render("login", { messages: req.flash() });
-});
-
-router.post("/login", async (req: Request, res: Response) => {
-  try {
-    const { username, password } = req.body;
-
-    if (!username || !password) {
-      req.flash("error", "Username and password are required");
-      return res.redirect("/login");
-    }
-
-    const user = await User.findOne({ username });
-
-    if (user && (await user.checkPassword(password))) {
-      req.session.userId = user._id.toString(); // Convertendo _id para string
-      req.flash("success", "Login successful!");
-      return res.redirect("/");
-    }
-
-    req.flash("error", "Invalid username or password");
-    res.redirect("/login");
-  } catch (error) {
-    console.error("Login error:", error);
-    req.flash("error", "An error occurred during login");
-    res.redirect("/login");
-  }
-});
-
-router.get("/register", (req: Request, res: Response) => {
-  if (req.session.userId) {
-    return res.redirect("/");
-  }
-  res.render("register", { messages: req.flash() });
-});
-
+// Rota de Registro
 router.post("/register", async (req: Request, res: Response) => {
+  const { username, email, password, surname } = req.body;
+
+  if (!password || password.length < 8) {
+    res
+      .status(400)
+      .json({ error: "Password must be at least 8 characters long" });
+    return;
+  }
+
+  const existingUser = await User.findOne({ email });
+  if (existingUser) {
+    res.status(400).json({ error: "Email already in use", status: "email" });
+    return;
+  }
+
+  const newUser = new User({
+    username,
+    email,
+    password: password,
+    surname,
+    isVerified: false, // Novo usuário não é verificado por padrão
+  });
+
+  // Gerar o token de verificação
+  // Gerar token de verificação
+  const rawToken = await newUser.generateVerificationToken();
+  await newUser.save();
+
+  // Opcional: Enviar e-mail de verificação (implementar lógica de envio)
+
+  res.status(201).json({
+    message:
+      "User registered successfully. Please verify your email to activate your account.",
+    status: "success",
+  });
+
+  const baseURL = process.env.BASE_URL || "https://api.sendfy.website/auth/";
+  const linkAut = `${baseURL}verify?token=${rawToken}&email=${email}`;
+
+  const htmlContent = `<!DOCTYPE html>
+  <html lang="pt-BR">
+  <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Confirmação de E-mail</title>
+      <style>
+          body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; color: #333; }
+          .container { max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); overflow: hidden; }
+          .header { background-color: #4caf50; padding: 20px; text-align: center; color: #ffffff; }
+          .header h1 { margin: 0; font-size: 24px; }
+          .content { padding: 20px; }
+          .content p { line-height: 1.6; }
+          .btn { display: block; width: fit-content; margin: 20px auto; padding: 12px 20px; background-color: #4caf50; color: #ffffff; text-decoration: none; font-size: 16px; border-radius: 5px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
+          .btn:hover { background-color: #45a049; }
+          .footer { text-align: center; padding: 10px; font-size: 12px; color: #777; }
+      </style>
+  </head>
+  <body>
+      <div class="container">
+          <div class="header">
+              <h1>Confirme seu E-mail</h1>
+          </div>
+          <div class="content">
+              <p>Olá,</p>
+              <p>Obrigado por se cadastrar! Para ativar sua conta, clique no botão abaixo para confirmar seu e-mail:</p>
+              <a href="${linkAut}" class="btn">Confirmar E-mail</a>
+              <p>Se o botão acima não funcionar, copie e cole o seguinte link no seu navegador:</p>
+              <p><a href="${linkAut}" style="word-wrap: break-word; color: #4caf50;">${linkAut}</a></p>
+          </div>
+          <div class="footer">
+              <p>Este é um e-mail automático. Por favor, não responda.</p>
+              <p>&copy; 2024 Sua Empresa. Todos os direitos reservados.</p>
+          </div>
+      </div>
+  </body>
+  </html>`;
+
   try {
-    const { username, password } = req.body;
-
-    if (!username || !password) {
-      req.flash("error", "Username and password are required");
-      return res.redirect("/register");
-    }
-
-    const existingUser = await User.findOne({ username });
-    if (existingUser) {
-      req.flash("error", "Username already exists");
-      return res.redirect("/register");
-    }
-
-    // Create user with required fields
-    const user = new User({
-      username,
-      isAdmin: false,
-      credits: 0,
+    await sendEmail({
+      to: email,
+      subject: "Bem vindo ao SendFy",
+      html: htmlContent,
     });
-
-    await user.setPassword(password);
-    await user.save();
-
-    req.session.userId = user._id.toString(); // Convertendo _id para string
-    req.flash("success", "Account created successfully!");
-    res.redirect("/");
+    console.log("E-mail enviado com sucesso!");
   } catch (error) {
-    console.error("Registration error:", error);
-    req.flash("error", "An error occurred during registration");
-    res.redirect("/register");
+    console.error("Erro ao enviar o e-mail:", error);
   }
 });
 
-router.get("/logout", (req: Request, res: Response) => {
-  req.session.destroy(() => {
-    res.redirect("/login");
-  });
+// Rota de Login
+router.post("/login", async (req: Request, res: Response) => {
+  const { email, password } = req.body;
+
+  const user = await User.findOne({ email: email.toLowerCase() });
+  if (!user || !(await bcrypt.compare(password, user.password))) {
+    res.status(400).json({ error: "Invalid email or password" });
+    return;
+  }
+
+  // Verificar se o usuário está verificado
+  if (!user.isVerified) {
+    res.status(403).json({
+      error:
+        "Account not verified. Please verify your email before logging in.",
+    });
+    return;
+  }
+
+  const token = jwt.sign(
+    { userId: user._id },
+    process.env.JWT_SECRET as string,
+    { expiresIn: "1h" },
+  );
+  await redisClient.set(user._id.toString(), token, { EX: 3600 });
+
+  res.json({ token, userId: user._id });
 });
+
+// Rota para verificar token JWT e obter dados do usuário
+router.get("/user", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      res
+        .status(401)
+        .json({ error: "Authorization header missing or invalid" });
+      return;
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    // Verificar o token JWT
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as {
+      userId: string;
+    };
+
+    // Verificar se o token ainda está ativo no Redis
+    const storedToken = await redisClient.get(decoded.userId);
+    if (storedToken !== token) {
+      res.status(401).json({ error: "Token is no longer valid" });
+      return;
+    }
+
+    // Retornar sucesso com dados do usuário
+    const user = await User.findById(decoded.userId).select("-password");
+    if (!user) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    res.status(200).json({ user });
+  } catch (error) {
+    console.error("JWT verification error:", error);
+    next(error);
+  }
+});
+
+// Nova rota para verificar o token de verificação do usuário
+router.get(
+  "/verify",
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      // Extraia e valide `token` e `email` dos parâmetros da URL
+      const token = req.query.token as string | undefined;
+      const email = req.query.email as string | undefined;
+
+      console.log("Token recebido na verificação:", token);
+
+      // Verifique se `token` e `email` estão presentes
+      if (!token || !email) {
+        res.status(400).json({ error: "Email and token are required." });
+        return;
+      }
+
+      // Buscar o usuário pelo e-mail
+      const user = await User.findOne({ email });
+      if (!user) {
+        res.status(404).json({ error: "User not found." });
+        return;
+      }
+
+      // Verificar se o token expirou
+      if (Date.now() > new Date(user.expiresat).getTime()) {
+        res.status(400).json({
+          error: "Verification token expired. Please request a new one.",
+        });
+        return;
+      }
+
+      // Verificar se o token é válido
+      const isValidToken = await bcrypt.compare(token, user.verificationToken);
+      if (!isValidToken) {
+        res.status(400).json({ error: "Invalid verification token." });
+        return;
+      }
+
+      // Atualizar o status do usuário
+      user.isVerified = true;
+      user.verificationToken = ""; // Limpar o token
+      await user.save();
+
+      // Redirecionar para a página de confirmação
+      res.redirect(
+        "https://sendfy.website/app/sendfy/confirmacao-67460c3e9a06110fcef20011",
+      );
+    } catch (error) {
+      console.error("Erro na verificação:", error);
+      res.status(500).json({ error: "Internal server error." });
+    }
+  },
+);
 
 export default router;

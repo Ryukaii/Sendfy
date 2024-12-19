@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 import { v4 as uuidv4 } from "uuid";
 
 const integrationSchema = new mongoose.Schema({
-  name: { type: String, required: true },
+  name: { type: String, required: true, unique: true },
   webhookUrl: {
     type: String,
     required: true,
