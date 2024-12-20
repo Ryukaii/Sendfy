@@ -1,5 +1,6 @@
 import { Schema, model, Document, Types } from "mongoose";
 import bcrypt from "bcrypt";
+const crypto = require("crypto");
 
 export interface IUser extends Document {
   _id: Types.ObjectId;
@@ -49,8 +50,6 @@ UserSchema.pre("save", async function (next) {
 // Método para gerar token de verificação
 UserSchema.methods.generateVerificationToken =
   async function (): Promise<string> {
-    const crypto = require("crypto");
-
     // Gera o token bruto
     const rawToken = crypto.randomBytes(32).toString("hex");
 

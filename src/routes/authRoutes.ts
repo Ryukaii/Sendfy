@@ -179,10 +179,11 @@ router.get("/user", async (req: Request, res: Response, next: NextFunction) => {
 // Nova rota para verificar o token de verificação do usuário
 router.get(
   "/verify",
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     console.log("Iniciando processo de verificação");
     try {
-      const { token, email } = req.query;
+      const token = req.query.token as string | undefined;
+      const email = req.query.email as string | undefined;
       console.log(`Token recebido: ${token}`);
       console.log(`Email recebido: ${email}`);
 
@@ -209,7 +210,8 @@ router.get(
 
       console.log(`Token armazenado: ${user.verificationToken}`);
       console.log(`Token recebido: ${token}`);
-      if (user.verificationToken !== token) {
+      const isValidToken = await bcrypt.compare(token, user.verificationToken);
+      if (!isValidToken) {
         console.log("Token inválido");
         res.status(400).json({ error: "Invalid token" });
         return;
