@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import mongoose from "mongoose";
 import "express-async-errors";
 import { schedulerService } from "./services/schedulerService";
+import cors from "cors";
 
 // Middlewares
 import authenticate from "./middleware/auth";
@@ -43,6 +44,15 @@ async function startServer() {
   await schedulerService.loadScheduledMessages();
 }
 startServer();
+
+app.use(
+  cors({
+    origin: "*", // Em produção, especifique os domínios permitidos
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  }),
+);
 
 // Configurar rotas
 app.use("/auth", authRoutes);

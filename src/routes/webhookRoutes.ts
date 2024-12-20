@@ -215,56 +215,96 @@ router.post(
           },
         );
 
+        const delay = message.delay?.time ?? 0;
         const scheduledTime = new Date(
           Date.now() +
-            (message.delay?.time ?? 0) *
-              getMilliseconds(message.delay?.counter ?? "minutes"),
+            delay * getMilliseconds(message.delay?.counter ?? "minutes"),
         );
 
         return {
-          messageTemplate: processedContent,
+          content: processedContent,
           scheduledTime,
+          delay,
         };
       });
 
       for (const message of processedMessages) {
-        const campaignHistory = new CampaignHistory({
-          campaignId: activeCampaign._id,
-          message: message.messageTemplate,
-          scheduledTime: message.scheduledTime,
-          recipient: telefone,
-          integrationId: integration._id,
-        });
-        await campaignHistory.save();
-
-        // Before creating the scheduledMessage
-        const scheduledMessage = await ScheduledMessage.create({
-          campaignId:
-            campaignHistory.campaignId ?? new mongoose.Types.ObjectId(),
-          phone: campaignHistory.phone ?? "",
-          content: campaignHistory.messageContent ?? "",
-          scheduledTime: campaignHistory.executedAt,
-          transactionId: campaignHistory.transaction_id ?? "",
-          createdBy: campaignHistory.createdBy ?? new mongoose.Types.ObjectId(),
-        });
-
-        const plainScheduledMessage: IScheduledMessage = {
-          ...scheduledMessage.toObject(),
-          createdBy:
-            scheduledMessage.createdBy ?? new mongoose.Types.ObjectId(),
-        };
-
-        await schedulerService.scheduleMessage(plainScheduledMessage);
+        console.log(message);
+        if (message.delay === 0) {
+          // Enviar SMS imediatamente
+          console.log("Mensagem com delay 0: Enviando sms imediatamente");
+          await sendSms(telefone, message.content);
+          await createCampaignHistory(
+            activeCampaign._id,
+            message.content,
+            telefone,
+            integration._id,
+            // createdBy é obrigatório, então o valor padrão é uma string vazia
+            integration.createdBy ?? new mongoose.Types.ObjectId(),
+          );
+        } else {
+          // Agendar mensagem para envio posterior
+          await scheduleMessage(
+            message,
+            telefone,
+            activeCampaign._id,
+            integration.createdBy ?? new mongoose.Types.ObjectId(),
+            transaction_id,
+          );
+        }
       }
 
       user.credits -= processedMessages.length;
       await user.save();
-      res.status(200).send("mensagens agendadas com sucesso");
+
+      res.status(200).send("Mensagens processadas com sucesso");
     } catch (error) {
       console.error("Erro ao processar webhook:", error);
       res.status(500).send("Erro ao processar webhook");
     }
   },
 );
+
+async function createCampaignHistory(
+  campaignId: mongoose.Types.ObjectId,
+  message: string,
+  recipient: string,
+  integrationId: mongoose.Types.ObjectId,
+  createdBy: mongoose.Types.ObjectId,
+): Promise<void> {
+  const campaignHistory = new CampaignHistory({
+    campaignId,
+    message,
+    executedAt: new Date(),
+    recipient,
+    integrationId,
+    createdBy,
+  });
+  await campaignHistory.save();
+}
+
+async function scheduleMessage(
+  message: { content: string; scheduledTime: Date },
+  phone: string,
+  campaignId: mongoose.Types.ObjectId,
+  createdBy: mongoose.Types.ObjectId,
+  transactionId: string,
+): Promise<void> {
+  const scheduledMessage = await ScheduledMessage.create({
+    campaignId,
+    phone,
+    content: message.content,
+    scheduledTime: message.scheduledTime,
+    transactionId,
+    createdBy,
+  });
+
+  const plainScheduledMessage: IScheduledMessage = {
+    ...scheduledMessage.toObject(),
+    createdBy: scheduledMessage.createdBy ?? new mongoose.Types.ObjectId(),
+  };
+
+  await schedulerService.scheduleMessage(plainScheduledMessage);
+}
 
 export default router;
