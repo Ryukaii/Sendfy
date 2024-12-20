@@ -177,59 +177,49 @@ router.get("/user", async (req: Request, res: Response, next: NextFunction) => {
 });
 
 // Nova rota para verificar o token de verificação do usuário
-router.get(
-  "/verify",
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      // Extraia e valide `token` e `email` dos parâmetros da URL
-      const token = req.query.token as string | undefined;
-      const email = req.query.email as string | undefined;
+router.get("/verify", async (req: Request, res: Response) => {
+  console.log("Iniciando processo de verificação");
+  try {
+    const { token, email } = req.query;
+    console.log(`Token recebido: ${token}`);
+    console.log(`Email recebido: ${email}`);
 
-      console.log("Token recebido na verificação:", token);
-
-      // Verifique se `token` e `email` estão presentes
-      if (!token || !email) {
-        res.status(400).json({ error: "Email and token are required." });
-        return;
-      }
-
-      // Buscar o usuário pelo e-mail
-      const user = await User.findOne({ email });
-      if (!user) {
-        res.status(404).json({ error: "User not found." });
-        return;
-      }
-
-      // Verificar se o token expirou
-      if (Date.now() > new Date(user.expiresat).getTime()) {
-        res.status(400).json({
-          error: "Verification token expired. Please request a new one.",
-        });
-        return;
-      }
-
-      // Verificar se o token é válido
-      const isValidToken = await bcrypt.compare(token, user.verificationToken);
-      if (!isValidToken) {
-        res.status(400).json({ error: "Invalid verification token." });
-        return;
-      }
-
-      // Atualizar o status do usuário
-      user.isVerified = true;
-      user.verificationToken = ""; // Limpar o token
-      await user.save();
-
-      // Redirecionar para a página de confirmação
-      res.redirect(
-        "https://sendfy.website/app/sendfy/confirmacao-67460c3e9a06110fcef20011",
-      );
-    } catch (error) {
-      console.error("Erro na verificação:", error);
-      res.status(500).json({ error: "Internal server error." });
+    if (!token || !email) {
+      console.log("Token ou email ausentes na requisição");
+      return res.status(400).json({ error: "Token and email are required" });
     }
-  },
-);
+
+    const user = await User.findOne({ email: email as string });
+    console.log(`Usuário encontrado: ${user ? "Sim" : "Não"}`);
+
+    if (!user) {
+      console.log("Usuário não encontrado");
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    console.log(`Usuário já verificado: ${user.isVerified}`);
+    if (user.isVerified) {
+      return res.status(400).json({ error: "Email already verified" });
+    }
+
+    console.log(`Token armazenado: ${user.verificationToken}`);
+    console.log(`Token recebido: ${token}`);
+    if (user.verificationToken !== token) {
+      console.log("Token inválido");
+      return res.status(400).json({ error: "Invalid token" });
+    }
+
+    user.isVerified = true;
+    user.verificationToken = undefined;
+    await user.save();
+    console.log("Usuário verificado com sucesso");
+
+    return res.status(200).json({ message: "Email verified successfully" });
+  } catch (error) {
+    console.error("Erro durante a verificação:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
 
 router.post("/refresh-token", async (req: Request, res: Response) => {
   const { refreshToken } = req.body;
