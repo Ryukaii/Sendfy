@@ -221,7 +221,10 @@ router.get(
       user.verificationToken = "";
       await user.save();
       console.log("Usuário verificado com sucesso");
-      res.redirect(process.env.APP_BASE_URL || "http://localhost:3000/");
+      res.redirect(
+        `${process.env.APP_BASE_URL}authLogin?verify=true` ||
+          "http://localhost:3000/",
+      );
       return;
     } catch (error) {
       console.error("Erro durante a verificação:", error);
