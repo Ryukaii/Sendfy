@@ -133,7 +133,16 @@ router.post("/login", async (req: Request, res: Response) => {
   await redisClient.set(user._id.toString(), token, { EX: 3600 });
   await redisClient.set(`refresh_${user._id}`, refreshToken);
 
-  res.json({ token, refreshToken, userId: user._id, expiresIn: 3600 });
+  res.json({
+    token,
+    refreshToken,
+    expiresIn: 3600,
+    userId: user._id,
+    username: user.username,
+    surname: user.surname,
+    email: user.email,
+    credits: user.credits,
+  });
 });
 
 // Rota para verificar token JWT e obter dados do usuário
