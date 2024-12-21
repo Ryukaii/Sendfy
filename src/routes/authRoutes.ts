@@ -221,8 +221,6 @@ router.get(
       user.verificationToken = "";
       await user.save();
       console.log("Usuário verificado com sucesso");
-
-      res.status(200).json({ message: "Email verified successfully" });
       res.redirect(process.env.APP_BASE_URL || "http://localhost:3000/");
       return;
     } catch (error) {
