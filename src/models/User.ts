@@ -14,6 +14,8 @@ export interface IUser extends Document {
   verificationToken: string;
   expiresat: Date;
   createdAt: Date;
+  resetPasswordToken: string;
+  resetPasswordExpiry: Date;
   setPassword(password: string): Promise<void>;
   checkPassword(password: string): Promise<boolean>;
   generateVerificationToken(): Promise<void>;
@@ -36,6 +38,8 @@ const UserSchema = new Schema<IUser>({
   verificationToken: { type: String },
   expiresat: { type: Date },
   createdAt: { type: Date, default: Date.now },
+  resetPasswordToken: { type: String },
+  resetPasswordExpiry: { type: Date },
 });
 
 // Pre-save hook para hash de senha

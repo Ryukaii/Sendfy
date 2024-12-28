@@ -277,4 +277,71 @@ router.post("/refresh-token", async (req: Request, res: Response) => {
   }
 });
 
+router.post("/forgot-password", async (req: Request, res: Response) => {
+  const { email } = req.body;
+
+  const user = await User.findOne({ email });
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  const resetToken = crypto.randomBytes(32).toString("hex");
+  const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hora a partir da data atual
+
+  user.resetPasswordToken = resetToken;
+  user.resetPasswordExpiry = resetTokenExpiry;
+  await user.save();
+
+  const baseURL = process.env.APP_BASE_URL || "https://api.sendfy.website/auth/";
+  const resetLink = `${baseURL}changePassword?token=${resetToken}&email=${email}`;
+
+  const htmlContent = `
+    <h1>Redefinição de Senha</h1>
+    <p>Olá,</p>
+    <p>Você solicitou a redefinição de sua senha. Clique no botão abaixo para criar uma nova senha:</p>
+    <a href="${resetLink}" style="background-color: #4CAF50; color: white; padding: 14px 20px; text-align: center; text-decoration: none; display: inline-block;">Redefinir Senha</a>
+    <p>Se o botão acima não funcionar, copie e cole o seguinte link no seu navegador:</p>
+    <p>${resetLink}</p>
+    <p>Este link expirará em 1 hora.</p>
+  `;
+
+  try {
+    await sendEmail({
+      to: email,
+      subject: "Redefinição de Senha",
+      html: htmlContent,
+    });
+    res.status(200).json({ message: "E-mail de redefinição de senha enviado com sucesso" });
+  } catch (error) {
+    console.error("Erro ao enviar o e-mail:", error);
+    res.status(500).json({ error: "Erro ao enviar o e-mail de redefinição de senha" });
+  }
+});
+
+
+router.post("/reset-password", async (req: Request, res: Response) => {
+  const { token, email, newPassword } = req.body;
+
+  const user = await User.findOne({ email });
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  if (user.resetPasswordToken !== token || user.resetPasswordExpiry < new Date()) {
+    res.status(400).json({ error: "Token inválido ou expirado" });
+    return;
+  }
+
+  user.password = newPassword;
+  user.resetPasswordToken = "";
+  user.resetPasswordExpiry = new Date();
+  await user.save();
+
+  res.status(200).json({ message: "Senha redefinida com sucesso" });
+});
+
+
+
 export default router;
