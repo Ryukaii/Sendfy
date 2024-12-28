@@ -234,6 +234,7 @@ router.post(
           // Enviar SMS imediatamente
           console.log("Mensagem com delay 0: Enviando sms imediatamente");
           await sendSms(telefone, message.content);
+          await User.findByIdAndUpdate(user._id, { $inc: { totalSmsSent: 1 } });
           await createCampaignHistory(
             activeCampaign._id,
             message.content,
@@ -297,6 +298,7 @@ async function scheduleMessage(
     scheduledTime: message.scheduledTime,
     transactionId,
     createdBy,
+    userId: createdBy,
   });
 
   const plainScheduledMessage: IScheduledMessage = {

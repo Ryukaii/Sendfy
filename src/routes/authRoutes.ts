@@ -142,6 +142,7 @@ router.post("/login", async (req: Request, res: Response) => {
     surname: user.surname,
     email: user.email,
     credits: user.credits,
+    totalSmsSent: user.totalSmsSent,
   });
 });
 

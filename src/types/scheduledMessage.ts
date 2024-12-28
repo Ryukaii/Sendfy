@@ -1,11 +1,14 @@
 import mongoose from "mongoose";
 export interface IScheduledMessage {
+  _id?: mongoose.Types.ObjectId;
   campaignId: mongoose.Types.ObjectId;
   phone: string;
   content: string;
   scheduledTime: Date;
   transactionId: string;
   createdBy: mongoose.Types.ObjectId;
+  userId: mongoose.Types.ObjectId;
+  status?: string;
 }
 
 interface ScheduledMessage {

@@ -3,7 +3,9 @@ import { IScheduledMessage } from "../types/scheduledMessage";
 import { sendSms } from "../utils/smsUtils";
 import { CampaignHistory } from "../models/CampaignHistory";
 import { ScheduledMessage } from "../models/ScheduledMessage";
+import { User } from "../models/User";
 import mongoose from "mongoose";
+
 
 export class SchedulerService {
   private jobs: Map<string, cron.ScheduledTask> = new Map();
@@ -33,10 +35,12 @@ export class SchedulerService {
   private async executeScheduledMessage(
     message: IScheduledMessage,
   ): Promise<void> {
-    const { campaignId, phone, content, transactionId, createdBy } = message;
+    const { campaignId, phone, content, transactionId, createdBy, userId } = message;
 
     try {
-      await sendSms(phone, content);
+      await sendSms(phone, content, );
+
+      await User.findByIdAndUpdate(userId, { $inc: { totalSmsSent: 1 } });
 
       await CampaignHistory.create({
         campaignId,
@@ -92,6 +96,7 @@ export class SchedulerService {
 
   private toScheduledMessage(doc: any): IScheduledMessage {
     return {
+      userId: doc.userId,
       campaignId: doc.campaignId,
       phone: doc.phone,
       content: doc.content,

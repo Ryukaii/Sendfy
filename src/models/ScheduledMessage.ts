@@ -15,6 +15,11 @@ const scheduledMessageSchema = new mongoose.Schema({
     reqired: true,
   },
   transactionId: { type: String, required: true },
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
+  },
 });
 
 export const ScheduledMessage = mongoose.model(
