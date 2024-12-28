@@ -293,8 +293,8 @@ router.post("/forgot-password", async (req: Request, res: Response) => {
   user.resetPasswordExpiry = resetTokenExpiry;
   await user.save();
 
-  const baseURL = process.env.APP_BASE_URL || "https://api.sendfy.website/auth/";
-  const resetLink = `${baseURL}changePassword?token=${resetToken}&email=${email}`;
+  const baseURL = process.env.APP_BASE_URL || "https://api.sendfy.website/";
+  const resetLink = `${baseURL}auth/changePassword?token=${resetToken}&email=${email}`;
 
   const htmlContent = `
     <h1>Redefinição de Senha</h1>
