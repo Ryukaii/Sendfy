@@ -2,6 +2,7 @@ import { Schema, model, Document, Types } from "mongoose";
 import bcrypt from "bcrypt";
 const crypto = require("crypto");
 
+
 export interface IUser extends Document {
   _id: Types.ObjectId;
   username: string;
@@ -16,10 +17,19 @@ export interface IUser extends Document {
   createdAt: Date;
   resetPasswordToken: string;
   resetPasswordExpiry: Date;
-  totalSmsSent: number;
+  activeCampaignsCount?: number;
+  integrationsCount?: number;
+  getActiveCampaignsCount(): Promise<number>;
+  getIntegrationsCount(): Promise<number>;
   setPassword(password: string): Promise<void>;
   checkPassword(password: string): Promise<boolean>;
   generateVerificationToken(): Promise<void>;
+  getSmsSuccessRate(): Promise<{
+    success: number;
+    failed: number;
+    total: number;
+    successRate: number;
+  }>;
 }
 
 const UserSchema = new Schema<IUser>({
@@ -41,7 +51,6 @@ const UserSchema = new Schema<IUser>({
   createdAt: { type: Date, default: Date.now },
   resetPasswordToken: { type: String },
   resetPasswordExpiry: { type: Date },
-  totalSmsSent: { type: Number, default: 0 },
 });
 
 // Pre-save hook para hash de senha
@@ -84,6 +93,50 @@ UserSchema.methods.checkPassword = function (
   password: string,
 ): Promise<boolean> {
   return bcrypt.compare(password, this.password);
+};
+
+UserSchema.methods.getActiveCampaignsCount = async function(): Promise<number> {
+  const activeCampaigns = await this.model('Campaign').countDocuments({
+    createdBy: this._id,
+    status: 'active'
+  });
+  
+  return activeCampaigns;
+};
+
+UserSchema.methods.getIntegrationsCount = async function(): Promise<number> {
+  const integrationsCount = await this.model('Integration').countDocuments({
+    createdBy: this._id
+  });
+  
+  return integrationsCount;
+};
+
+UserSchema.methods.getSmsSuccessRate = async function(): Promise<{
+  success: number;
+  failed: number;
+  total: number;
+  successRate: number;
+}> {
+  const successCount = await this.model('CampaignHistory').countDocuments({
+    createdBy: this._id,
+    responseStatus: 'sent'
+  });
+
+  const failedCount = await this.model('CampaignHistory').countDocuments({
+    createdBy: this._id,
+    responseStatus: 'failed'
+  });
+
+  const total = successCount + failedCount;
+  const successRate = total > 0 ? (successCount / total) * 100 : 0;
+
+  return {
+    success: successCount,
+    failed: failedCount,
+    total: total,
+    successRate: parseFloat(successRate.toFixed(2))
+  };
 };
 
 export const User = model<IUser>("User", UserSchema);

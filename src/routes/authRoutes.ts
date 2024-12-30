@@ -133,6 +133,10 @@ router.post("/login", async (req: Request, res: Response) => {
   await redisClient.set(user._id.toString(), token, { EX: 3600 });
   await redisClient.set(`refresh_${user._id}`, refreshToken);
 
+  const activeCampaignsCount = await user.getActiveCampaignsCount();
+  const integrationsCount = await user.getIntegrationsCount();
+  const smsStats = await user.getSmsSuccessRate();
+
   res.json({
     token,
     refreshToken,
@@ -142,7 +146,9 @@ router.post("/login", async (req: Request, res: Response) => {
     surname: user.surname,
     email: user.email,
     credits: user.credits,
-    totalSmsSent: user.totalSmsSent,
+    activeCampaignsCount: activeCampaignsCount,
+    integrationsCount: integrationsCount,
+    smsStats: smsStats,
   });
 });
 
