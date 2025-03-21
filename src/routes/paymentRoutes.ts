@@ -93,8 +93,7 @@ router.post(
           },
         },
       );
-      console.log(response);
-      const { pixQrCode, pixCode } = response.data;
+      const { pixQrCode, pixCode, id } = response.data;
 
       // Salvar no banco de dados
       await Payment.create({
@@ -110,6 +109,7 @@ router.post(
 
       res.status(200).json({
         message: "QR Code gerado com sucesso.",
+        id,
         pixQrCode,
         pixCode,
       });

@@ -58,9 +58,9 @@ app.use(
 app.use("/auth", authRoutes);
 app.use("/campaign", authenticate, campaignRoutes);
 app.use("/integration", authenticate, integrationRoutes);
-app.use("/sms", sendSMSRoutes);
-app.use("/verify-jwt", verifyJWT);
-app.use("/payment", payment);
+app.use("/sms", authenticate, sendSMSRoutes);
+app.use("/verify-jwt", authenticate, verifyJWT);
+app.use("/payment", authenticate, payment);
 app.use("/api", webhookRoutes); // Adiciona as rotas de webhooks
 
 // Middleware de tratamento de erros (deve ser o último)
