@@ -14,10 +14,10 @@ router.get(
         return;
       }
 
-      const campaings = await Integration.find({
+      const campaigns = await Campaign.find({
         createdBy: req.query.userId,
       });
-      res.status(200).json(campaings);
+      res.status(200).json(campaigns);
     } catch (error) {
       next(error); // Encaminhar erro para o middleware de erros
     }
