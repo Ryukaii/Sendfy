@@ -33,9 +33,18 @@ router.get('/platforms', (req: Request, res: Response) => {
 // Rota para retornar todos os tipos de eventos disponíveis por plataforma
 router.get('/event-types', (req: Request, res: Response) => {
   try {
+    const platformQuery = req.query.platform as PaymentPlatform | undefined;
     const platforms: PaymentPlatform[] = ['For4Payments', 'VegaCheckout'];
     const eventTypesByPlatform: Record<PaymentPlatform, string[]> = {} as Record<PaymentPlatform, string[]>;
     
+    // Se tiver uma plataforma específica na query, retorna só os eventos dela
+    if (platformQuery && platforms.includes(platformQuery)) {
+      eventTypesByPlatform[platformQuery] = getEventTypesForPlatform(platformQuery);
+      res.status(200).json({ eventTypes: eventTypesByPlatform });
+      return;
+    }
+    
+    // Caso contrário, retorna para todas as plataformas
     platforms.forEach(platform => {
       eventTypesByPlatform[platform] = getEventTypesForPlatform(platform);
     });
