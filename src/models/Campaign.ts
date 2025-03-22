@@ -14,8 +14,8 @@ const MessageSchema = new Schema({
     },
     counter: {
       type: String,
-      enum: ["minutes", "hours", "days"],
-      default: "minutes",
+      enum: ["seconds", "minutes", "hours"],
+      default: "seconds",
     },
   },
 });
@@ -31,7 +31,7 @@ interface ICampaignDocument extends mongoose.Document {
     messageTemplate: string;
     delay: {
       time: number;
-      counter: "minutes" | "hours" | "days";
+      counter: "seconds" | "minutes" | "hours";
     };
   }>;
   createdBy: mongoose.Types.ObjectId;
