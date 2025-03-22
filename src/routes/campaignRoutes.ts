@@ -29,7 +29,7 @@ router.post(
   "/",
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { name, integrationName, tipoEvento, messages, status } = req.body;
+      const { name, integrationName, tipoEvento, messages, status, paymentPlatform } = req.body;
 
       if (!req.user?.userId) {
         res.status(401).send("Usuário não autorizado");
@@ -49,6 +49,7 @@ router.post(
         messages,
         createdBy: req.user.userId,
         status: status || "pending",
+        paymentPlatform,
       });
 
       await campaign.save();
@@ -66,7 +67,7 @@ router.put(
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.query;
-      const { name, integrationName, tipoEvento, messages, status } = req.body;
+      const { name, integrationName, tipoEvento, messages, status, paymentPlatform } = req.body;
 
       if (!id) {
         res.status(400).json({ error: "ID da campanha é obrigatório." });
@@ -75,7 +76,7 @@ router.put(
 
       const updatedCampaign = await Campaign.findByIdAndUpdate(
         id,
-        { name, integrationName, tipoEvento, messages, status },
+        { name, integrationName, tipoEvento, messages, status, paymentPlatform },
         { new: true },
       );
 
